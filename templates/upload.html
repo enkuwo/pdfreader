@@ -30,9 +30,6 @@
             display: block;
             margin-bottom: 8px;
         }
-        .question-group {
-            margin-top: 20px;
-        }
         button {
             margin-top: 20px;
             padding: 10px 20px;
@@ -53,6 +50,7 @@
     </style>
 </head>
 <body>
+
 <div class="container">
     <h2>Upload Your PDF</h2>
     {% if error %}
@@ -74,12 +72,6 @@
                 <input type="text" name="keyword" placeholder="Enter keyword to search" style="width:100%; padding: 8px;">
             </div>
         </div>
-
-        <div class="question-group">
-            <label><strong>Optional: Ask a question about the PDF</strong></label>
-            <input type="text" name="question" placeholder="Ask something..." style="width:100%; padding: 8px;">
-        </div>
-
         <button type="submit">Summarize PDF</button>
     </form>
 </div>
@@ -92,5 +84,6 @@
         });
     });
 </script>
+
 </body>
 </html>
