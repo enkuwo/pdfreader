@@ -2,87 +2,46 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PDF Summarizer</title>
-    
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 40px;
-            background-color: #f4f4f4;
-        }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        h2 {
-            text-align: center;
-        }
-        input[type="file"] {
-            margin-top: 10px;
-        }
-        .radio-group {
-            margin-top: 20px;
-        }
-        .radio-group label {
-            display: block;
-            margin-bottom: 8px;
-        }
-        button {
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: #007BFF;
-            border: none;
-            color: white;
-            font-size: 16px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        .error {
-            color: red;
-            margin-top: 10px;
-        }
-    </style>
+    <title>Smart PDF Summarizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 <div class="container">
-    <h2>Upload Your PDF</h2>
+    <h1>📄 Smart PDF Summarizer</h1>
+    <p>Upload any research PDF and our AI will summarize it with simple explanation, tables and charts.</p>
+
     {% if error %}
         <div class="error">{{ error }}</div>
     {% endif %}
+
     <form method="POST" enctype="multipart/form-data">
-        <label>Choose PDF:</label>
+        <label><strong>Choose PDF File:</strong></label>
         <input type="file" name="file" accept="application/pdf" required>
 
-        <div class="radio-group">
-            <label><strong>Select Summary Mode:</strong></label>
-            <label><input type="radio" name="mode" value="numbers"> Number Search (extract all numeric values)</label>
-            <label><input type="radio" name="mode" value="full" required> Full Summary (entire PDF)</label>
-            <label><input type="radio" name="mode" value="page"> Page-by-Page Summary</label>
-            <label><input type="radio" name="mode" value="most_used"> Most Used Keyword + Summary</label>
-            <label><input type="radio" name="mode" value="group"> Grouped Summary (every 3 pages)</label>
-            <label><input type="radio" name="mode" value="keyword"> Search & Summarize by Keyword</label>
-            <div id="keywordInput" style="margin-top: 10px; display: none;">
-                <input type="text" name="keyword" placeholder="Enter keyword to search" style="width:100%; padding: 8px;">
-            </div>
-            <script>
-                document.querySelectorAll('input[name="mode"]').forEach(radio => {
-                    radio.addEventListener('change', function() {
-                        const keywordBox = document.getElementById('keywordInput');
-                        keywordBox.style.display = (this.value === 'keyword') ? 'block' : 'none';
-                    });
-                });
-                </script>
+        <label style="margin-top: 20px;"><strong>Select Summary Mode:</strong></label>
+        <select name="mode" required onchange="toggleKeywordInput(this.value)">
+            <option value="">-- Choose Summary Mode --</option>
+            <option value="full">Full Summary (entire PDF)</option>
+            <option value="page">Page-by-Page Summary</option>
+            <option value="group">Grouped Summary (every 3 pages)</option>
+            <option value="numbers">Number Search</option>
+            <option value="most_used">Most Used Keyword</option>
+            <option value="keyword">Search & Summarize by Keyword</option>
+        </select>
+
+        <div id="keywordInput" style="display: none; margin-top: 10px;">
+            <input type="text" name="keyword" placeholder="Enter keyword to search">
         </div>
 
         <button type="submit">Summarize PDF</button>
     </form>
 </div>
+
+<script>
+    function toggleKeywordInput(mode) {
+        const keywordBox = document.getElementById('keywordInput');
+        keywordBox.style.display = (mode === 'keyword') ? 'block' : 'none';
+    }
+</script>
 </body>
 </html>

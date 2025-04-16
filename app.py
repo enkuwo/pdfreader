@@ -6,6 +6,9 @@ from collections import Counter
 from langdetect import detect
 from pdf2image import convert_from_bytes
 import pytesseract
+import pytesseract
+pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
+
 from PIL import Image
 from fpdf import FPDF
 from docx import Document
