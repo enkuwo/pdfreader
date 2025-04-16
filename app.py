@@ -19,7 +19,7 @@ import os
 app = Flask(__name__)
 
 # Hugging Face API headers
-HEADERS = {"Authorization": "Bearer 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"}
+HEADERS = {"Authorization": "Bearer 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"}
 
 STOPWORDS = {
     "the", "and", "to", "of", "in", "a", "is", "it", "that", "on", "for", "with", "as", "was",
