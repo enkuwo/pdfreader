@@ -253,4 +253,4 @@ def download_summary():
         return send_file(output, as_attachment=True, download_name="summary.pdf", mimetype="application/pdf")
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
