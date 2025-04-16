@@ -15,9 +15,10 @@ from docx import Document
 import io
 import unicodedata
 import os
+from flask_cors import CORS
 
 app = Flask(__name__)
-
+CORS(app)
 # Hugging Face API headers
 HEADERS = {"Authorization": "Bearer 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"}
 
@@ -193,6 +194,39 @@ def export_summary_to_word(summary_text):
     doc.save(output)
     output.seek(0)
     return output
+def ask_question_with_chatui(context, question):
+    API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
+    headers = {"Authorization": HEADERS["Authorization"]}
+
+    prompt = f"""
+You are a helpful assistant. Answer the user's question based on the document.
+
+Document:
+{context}
+
+Question: {question}
+Answer:"""
+
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 300,
+            "temperature": 0.7
+        }
+    }
+
+    response = requests.post(API_URL, headers=headers, json=payload)
+
+    try:
+        result = response.json()
+        if isinstance(result, list) and "generated_text" in result[0]:
+            return result[0]["generated_text"]
+        elif "error" in result:
+            return f"(Model Error: {result['error']})"
+        else:
+            return str(result)
+    except Exception as e:
+        return f"(Exception: {e})"
 
 def generate_number_illustrations(text_pages):
     full_text = " ".join(text_pages)
@@ -328,9 +362,14 @@ def ask_about_pdf():
         text_pages = extract_text_from_pdf(f)
     context = "\n\n".join(text_pages)
     answer = ask_question_local(context, question)
-    matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())]
-    return render_template("result.html", question=question, answer=answer, pages=matched_pages)
 
+    # Find relevant pages for the answer
+    matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())]
+
+    # Prepare image links for matched pages
+    image_links = [f"/static/page_images/page_{page}.png" for page in matched_pages]
+
+    return render_template("result.html", question=question, answer=answer, pages=matched_pages, images=image_links)
 @app.route("/download", methods=["POST"])
 def download_summary():
     summary = request.form.get("summary")
