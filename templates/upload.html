@@ -16,10 +16,10 @@
 
     <form method="POST" enctype="multipart/form-data">
         <label><strong>Choose PDF File:</strong></label>
-        <input type="file" name="file" accept="application/pdf" required>
+        <input type="file" name="file" accept="application/pdf">
 
         <label style="margin-top: 20px;"><strong>Select Summary Mode:</strong></label>
-        <select name="mode" required onchange="toggleKeywordInput(this.value)">
+        <select name="mode" onchange="toggleKeywordInput(this.value)">
             <option value="">-- Choose Summary Mode --</option>
             <option value="full">Full Summary (entire PDF)</option>
             <option value="page">Page-by-Page Summary</option>
@@ -27,6 +27,7 @@
             <option value="numbers">Number Search</option>
             <option value="most_used">Most Used Keyword</option>
             <option value="keyword">Search & Summarize by Keyword</option>
+            <option value="illustration">Illustration Mode (AI-generated numbers + meaning)</option>
         </select>
 
         <div id="keywordInput" style="display: none; margin-top: 10px;">
@@ -34,6 +35,10 @@
         </div>
 
         <button type="submit">Summarize PDF</button>
+        <br><br><br><br>
+        <label><strong>Ask something (optional):</strong></label>
+        <input type="text" name="chat_question" placeholder="Ask anything..." style="width: 100%; padding: 10px; margin-top: 10px;">
+        <button type="submit" name="ask">Ask now</button>
     </form>
 </div>
 

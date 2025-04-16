@@ -102,20 +102,72 @@ def find_most_frequent_keyword(text_pages, lang):
     ]
     return f"Most frequent keyword: **{top_keyword}**\n\n" + "\n".join(summaries)
 
-def ask_question_local(context, question):
-    model = "deepset/roberta-base-squad2"
+def ask_question_local(summary, question):
+    model = "google/flan-t5-base"  # Better for natural Q&A
     API_URL = f"https://api-inference.huggingface.co/models/{model}"
     headers = {"Authorization": HEADERS["Authorization"]}
-    payload = {"inputs": {"question": question, "context": context}}
+    
+    prompt = (
+        f"You are a helpful assistant. Based on the summary below, answer the user's question clearly.\n\n"
+        f"Summary:\n{summary}\n\n"
+        f"Question: {question}\n"
+        f"Answer:"
+    )
+
+    payload = {"inputs": prompt}
     response = requests.post(API_URL, headers=headers, json=payload)
 
     try:
         result = response.json()
         if "error" in result:
             return f"(Hugging Face Error: {result['error']})"
-        return result.get("answer", "(No answer found)")
-    except requests.exceptions.JSONDecodeError:
-        return f"(Invalid response from Hugging Face: {response.text[:200]})"
+
+        ai_answer = result[0].get("generated_text", "").strip()
+        return (
+            f"As for your uploaded PDF, here’s what I found:\n\n"
+            f"📌 Question: {question}\n"
+            f"💬 Answer: {ai_answer}\n\n"
+            f"Generally, this is based on the summarized content of the document."
+        )
+
+    except Exception as e:
+        return f"(Error while generating answer: {str(e)})"
+
+
+def aichat_main(question):
+    model = "google/flan-t5-large"
+    API_URL = f"https://api-inference.huggingface.co/models/{model}"
+    headers = {"Authorization": HEADERS["Authorization"]}
+
+    prompt = (
+        "You are a helpful assistant. Answer the user's question clearly and concisely.\n\n"
+        f"Question: {question}\n"
+        "Answer:"
+    )
+
+    payload = {"inputs": prompt}
+
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        result = response.json()
+
+        if "error" in result:
+            return f"(Hugging Face Error: {result['error']})"
+
+        ai_answer = result[0].get("generated_text", "").strip()
+
+        return (
+            f"Here’s what I found:\n\n"
+            f"📌 Question: {question}\n"
+            f"💬 Answer: {ai_answer}\n\n"
+            f"Generally, this is for educational use only."
+        )
+
+    except Exception as e:
+        return f"(Error while generating answer: {str(e)})"
+
+
+
 
 def remove_non_latin(text):
     return unicodedata.normalize('NFKD', text).encode('latin-1', 'ignore').decode('latin-1')
@@ -142,6 +194,46 @@ def export_summary_to_word(summary_text):
     output.seek(0)
     return output
 
+def generate_number_illustrations(text_pages):
+    full_text = " ".join(text_pages)
+    lines = full_text.split('.')
+
+    model = "google/flan-t5-large"
+    API_URL = f"https://api-inference.huggingface.co/models/{model}"
+    headers = {"Authorization": HEADERS["Authorization"]}
+
+    data = []
+
+    for line in lines:
+        if re.search(r'\b(19|20)\d{2}\b', line) and re.search(r'\d+', line):  # must have year + number
+            prompt = (
+                    "Given the sentence below, identify what the number refers to.\n"
+                    "Write your answer ONLY in this format:\n"
+                    "Thing in Year = Value\n\n"
+                    "Sentence: In 2023, the number of participants skyrocketed from 20 to 100 people.\n"
+                    "Answer:"
+            )
+
+            response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
+            try:
+                result = response.json()
+                if isinstance(result, list) and "generated_text" in result[0]:
+                    text = result[0]["generated_text"].strip()
+                    if "=" in text and "in" in text:
+                        data.append(text)
+            except:
+                continue
+
+    print("🧠 AI structured output:", data)
+    print("🔁 RAW AI response:", response.json())
+    if not data:
+        data.append("⚠️ No values found. Try another PDF with more clear numbers.")
+
+
+    return data[:10]
+
+
+
 # --- Flask Routes ---
 
 @app.route("/", methods=["GET", "POST"])
@@ -151,9 +243,24 @@ def upload_file():
         mode = request.form.get("mode")
         keyword = request.form.get("keyword", "").strip()
         question = request.form.get("question", "").strip()
+        chat_question = request.form.get("chat_question", "").strip()
 
-        if not pdf:
-            return render_template("upload.html", error="Please upload a PDF.")
+        if chat_question and not pdf:
+            chat_answer = aichat_main(chat_question)
+            return render_template(
+                "result.html",
+                summary=None,
+                question=None,
+                answer=None,
+                pages=None,
+                illustrations=None,
+                chat_answer=chat_answer
+            )
+
+
+        if not pdf and not chat_question:
+            return render_template("upload.html", error="Please upload a PDF or ask a question.")
+
 
         pdf.save("uploaded.pdf")
         generate_page_images("uploaded.pdf")
@@ -182,20 +289,37 @@ def upload_file():
             summary = search_and_summarize_by_keyword(text_pages, keyword, lang)
         elif mode == "most_used":
             summary = find_most_frequent_keyword(text_pages, lang)
+        elif mode == "illustration":
+            illustrations = generate_number_illustrations(text_pages)
+            summary = summarize_full(text_pages, lang)  # optional
+            chat_answer = aichat_main(chat_question) if chat_question else None
+            return render_template("result.html", summary=summary, illustrations=illustrations, question=None, answer=None, pages=None, chat_answer=chat_answer)
         else:
             summary = "(Invalid mode selected.)"
 
         if question:
-            context = "\n\n".join(text_pages)
+            context = summary
             answer = ask_question_local(context, question)
             matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())]
         else:
             answer = None
             matched_pages = None
 
-        return render_template("result.html", summary=summary, question=question, answer=answer, pages=matched_pages)
+        # ✅ generate chat_answer here for regular modes
+        chat_answer = aichat_main(chat_question) if chat_question else None
+
+        return render_template(
+            "result.html",
+            summary=summary,
+            question=question,
+            answer=answer,
+            pages=matched_pages,
+            illustrations=None,
+            chat_answer=chat_answer
+        )
 
     return render_template("upload.html")
+
 
 @app.route("/ask", methods=["POST"])
 def ask_about_pdf():
