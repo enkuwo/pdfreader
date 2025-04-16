@@ -4,7 +4,7 @@ import requests
 import re
 from collections import Counter
 from langdetect import detect
-from pdf2image import convert_from_bytes
+from pdf2image import convert_from_bytes, convert_from_path
 import pytesseract
 import pytesseract
 pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
@@ -14,48 +14,52 @@ from fpdf import FPDF
 from docx import Document
 import io
 import unicodedata
+import os
+
 app = Flask(__name__)
 
-# Hugging Face API keys
+# Hugging Face API headers
 HEADERS = {"Authorization": "Bearer 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"}
 
-# Stopwords
 STOPWORDS = {
     "the", "and", "to", "of", "in", "a", "is", "it", "that", "on", "for", "with", "as", "was",
     "are", "this", "an", "by", "be", "from", "at", "or", "which", "you", "not", "but", "we"
 }
 
-# --- Extraction Utilities ---
+# --- Utilities ---
 
 def extract_text_with_ocr(pdf_bytes):
     images = convert_from_bytes(pdf_bytes.read())
-    text_pages = [pytesseract.image_to_string(img) for img in images]
-    return text_pages
+    return [pytesseract.image_to_string(img) for img in images]
+
+def generate_page_images(pdf_path):
+    if not os.path.exists("static/page_images"):
+        os.makedirs("static/page_images")
+    for file in os.listdir("static/page_images"):
+        os.remove(os.path.join("static/page_images", file))
+    images = convert_from_path(pdf_path)
+    for i, image in enumerate(images):
+        image.save(f'static/page_images/page_{i+1}.png', 'PNG')
 
 def extract_text_from_pdf(pdf):
     doc = fitz.open(stream=pdf.read(), filetype="pdf")
     return [page.get_text() for page in doc]
 
 def detect_language(text_pages):
-    full_text = " ".join(text_pages)
     try:
-        return detect(full_text)
+        return detect(" ".join(text_pages))
     except:
         return "en"
-
-# --- Summarization Utilities ---
 
 def summarize_text(text, lang="en"):
     if lang == "en":
         model_url = "https://api-inference.huggingface.co/models/google/pegasus-cnn_dailymail"
     else:
         model_url = "https://api-inference.huggingface.co/models/facebook/mbart-large-cc25"
-
-    payload = {"inputs": text[:1000]}  # Truncate if too long
+    payload = {"inputs": text[:1000]}
     response = requests.post(model_url, headers=HEADERS, json=payload)
-
     if response.status_code == 200:
-        return response.json()[0]["summary_text"]
+        return response.json()[0].get("summary_text", "(No summary returned)")
     return f"(Summary error: {response.text})"
 
 def summarize_full(text_pages, lang):
@@ -76,8 +80,7 @@ def summarize_in_groups(text_pages, lang, group_size=3):
     return "\n".join(summaries)
 
 def extract_numbers(text_pages):
-    numbers = re.findall(r'\b\d+(?:\.\d+)?\b', " ".join(text_pages))
-    return "Found numbers:\n" + ", ".join(numbers)
+    return "Found numbers:\n" + ", ".join(re.findall(r'\b\d+(?:\.\d+)?\b', " ".join(text_pages)))
 
 def search_and_summarize_by_keyword(text_pages, keyword, lang):
     summaries = []
@@ -88,22 +91,31 @@ def search_and_summarize_by_keyword(text_pages, keyword, lang):
     return "\n".join(summaries) if summaries else f"No results found for '{keyword}'."
 
 def find_most_frequent_keyword(text_pages, lang):
-    full_text = " ".join(text_pages).lower()
-    words = re.findall(r'\b[a-zA-Z]{3,}\b', full_text)
+    words = re.findall(r'\b[a-zA-Z]{3,}\b', " ".join(text_pages).lower())
     filtered = [word for word in words if word not in STOPWORDS]
-
     if not filtered:
         return "(No valid keywords found.)"
-
     top_keyword, _ = Counter(filtered).most_common(1)[0]
     summaries = [
         f"Page {i+1}:\n{summarize_text(page, lang)}\n"
         for i, page in enumerate(text_pages) if top_keyword in page.lower()
     ]
-
     return f"Most frequent keyword: **{top_keyword}**\n\n" + "\n".join(summaries)
 
-# --- Export Utilities ---
+def ask_question_local(context, question):
+    model = "deepset/roberta-base-squad2"
+    API_URL = f"https://api-inference.huggingface.co/models/{model}"
+    headers = {"Authorization": HEADERS["Authorization"]}
+    payload = {"inputs": {"question": question, "context": context}}
+    response = requests.post(API_URL, headers=headers, json=payload)
+
+    try:
+        result = response.json()
+        if "error" in result:
+            return f"(Hugging Face Error: {result['error']})"
+        return result.get("answer", "(No answer found)")
+    except requests.exceptions.JSONDecodeError:
+        return f"(Invalid response from Hugging Face: {response.text[:200]})"
 
 def remove_non_latin(text):
     return unicodedata.normalize('NFKD', text).encode('latin-1', 'ignore').decode('latin-1')
@@ -113,12 +125,8 @@ def export_summary_to_pdf(summary_text):
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_font("Arial", size=12)
-    
-    clean_text = remove_non_latin(summary_text)
-    
-    for line in clean_text.split('\n'):
+    for line in remove_non_latin(summary_text).split('\n'):
         pdf.multi_cell(0, 10, line)
-    
     output = io.BytesIO()
     pdf.output(output)
     output.seek(0)
@@ -142,11 +150,14 @@ def upload_file():
         pdf = request.files["file"]
         mode = request.form.get("mode")
         keyword = request.form.get("keyword", "").strip()
+        question = request.form.get("question", "").strip()
 
         if not pdf:
             return render_template("upload.html", error="Please upload a PDF.")
 
-        # Try extracting text first
+        pdf.save("uploaded.pdf")
+        generate_page_images("uploaded.pdf")
+
         try:
             text_pages = extract_text_from_pdf(pdf)
             if not any(text.strip() for text in text_pages):
@@ -174,15 +185,32 @@ def upload_file():
         else:
             summary = "(Invalid mode selected.)"
 
-        return render_template("result.html", summary=summary)
+        if question:
+            context = "\n\n".join(text_pages)
+            answer = ask_question_local(context, question)
+            matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())]
+        else:
+            answer = None
+            matched_pages = None
+
+        return render_template("result.html", summary=summary, question=question, answer=answer, pages=matched_pages)
 
     return render_template("upload.html")
+
+@app.route("/ask", methods=["POST"])
+def ask_about_pdf():
+    question = request.form.get("question", "").strip()
+    with open("uploaded.pdf", "rb") as f:
+        text_pages = extract_text_from_pdf(f)
+    context = "\n\n".join(text_pages)
+    answer = ask_question_local(context, question)
+    matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())]
+    return render_template("result.html", question=question, answer=answer, pages=matched_pages)
 
 @app.route("/download", methods=["POST"])
 def download_summary():
     summary = request.form.get("summary")
     file_type = request.form.get("filetype", "pdf")
-
     if file_type == "word":
         output = export_summary_to_word(summary)
         return send_file(output, as_attachment=True, download_name="summary.docx", mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
@@ -190,6 +218,5 @@ def download_summary():
         output = export_summary_to_pdf(summary)
         return send_file(output, as_attachment=True, download_name="summary.pdf", mimetype="application/pdf")
 
-# --- Run the App ---
 if __name__ == "__main__":
     app.run(debug=True)
