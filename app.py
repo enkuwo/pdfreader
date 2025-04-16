@@ -12,10 +12,8 @@ from docx import Document
 import io
 import unicodedata
 import os
-from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app)
 # Hugging Face API headers
 HEADERS = {"Authorization": "Bearer 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"}
 
