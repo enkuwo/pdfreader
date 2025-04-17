@@ -15,8 +15,13 @@ from docx import Document
 import io
 import unicodedata
 import os
+from openai import OpenAI
 
 app = Flask(__name__)
+
+client = OpenAI(
+    base_url="https://api.netmind.ai/inference-api/openai/v1",
+    api_key="2d5f3905331943cfbebcf472e959e146",)
 
 # Hugging Face API headers
 HEADERS = {"Authorization": "Bearer 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"}
@@ -197,40 +202,37 @@ def export_summary_to_word(summary_text):
 def generate_number_illustrations(text_pages):
     full_text = " ".join(text_pages)
     lines = full_text.split('.')
-
-    model = "google/flan-t5-large"
-    API_URL = f"https://api-inference.huggingface.co/models/{model}"
-    headers = {"Authorization": HEADERS["Authorization"]}
-
     data = []
 
     for line in lines:
-        if re.search(r'\b(19|20)\d{2}\b', line) and re.search(r'\d+', line):  # must have year + number
-            prompt = (
-                    "Given the sentence below, identify what the number refers to.\n"
-                    "Write your answer ONLY in this format:\n"
-                    "Thing in Year = Value\n\n"
-                    "Sentence: In 2023, the number of participants skyrocketed from 20 to 100 people.\n"
-                    "Answer:"
+        # Skip short or non-numbered lines
+        if len(line.strip()) < 10 or not re.search(r'\d', line):
+            continue
+
+        # Build prompt
+        prompt = (
+            "Understand what the number(s) mean in the sentence below, "
+            "and write the answer like: Label in Year = Value\n\n"
+            f"Sentence: {line.strip()}\nAnswer:"
+        )
+
+        try:
+            chat_response = client.chat.completions.create(
+                model="google/gemma-3-27b-it",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=100
             )
+            reply = chat_response.choices[0].message.content.strip()
+            if "=" in reply and "in" in reply:
+                data.append(reply)
 
-            response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
-            try:
-                result = response.json()
-                if isinstance(result, list) and "generated_text" in result[0]:
-                    text = result[0]["generated_text"].strip()
-                    if "=" in text and "in" in text:
-                        data.append(text)
-            except:
-                continue
+        except Exception as e:
+            print("⚠️ AI error:", e)
+            continue
 
-    print("🧠 AI structured output:", data)
-    print("🔁 RAW AI response:", response.json())
-    if not data:
-        data.append("⚠️ No values found. Try another PDF with more clear numbers.")
-
-
+    print("✅ Final Netmind data:", data)
     return data[:10]
+
 
 
 
