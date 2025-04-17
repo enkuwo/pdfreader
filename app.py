@@ -7,7 +7,7 @@ from langdetect import detect
 from pdf2image import convert_from_bytes, convert_from_path
 import pytesseract
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
+#pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
 
 from PIL import Image
 from fpdf import FPDF
@@ -266,12 +266,14 @@ def upload_file():
         generate_page_images("uploaded.pdf")
 
         try:
+            pdf.seek(0)  # ✅ reset before reading
             text_pages = extract_text_from_pdf(pdf)
             if not any(text.strip() for text in text_pages):
                 raise ValueError("Empty text, using OCR")
         except:
-            pdf.seek(0)
+            pdf.seek(0)  # ✅ reset again before OCR
             text_pages = extract_text_with_ocr(pdf)
+
 
         lang = detect_language(text_pages)
 
