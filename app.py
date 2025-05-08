@@ -1,30 +1,25 @@
 from flask import Flask, request, render_template, send_file
+
 import fitz  # PyMuPDF
-import requests
 import re
 from collections import Counter
 from langdetect import detect
 from pdf2image import convert_from_bytes, convert_from_path
 import pytesseract
-import pytesseract
-#pytesseract.pytesseract.tesseract_cmd = r"C:/Program Files/Tesseract-OCR/tesseract.exe"
-
 from PIL import Image
 from fpdf import FPDF
 from docx import Document
 import io
 import unicodedata
 import os
-from openai import OpenAI
+
+import google.generativeai as genai
+
+# --- Google Gemma 3 API Setup ---
+genai.configure(api_key="AIzaSyCIRCrUjUdkRiW0tETGunbe8W1ujleLayQ")
+GEMMA_MODEL = "gemma-3-27b-it"  # You can use "gemma-3-4b-it" for lighter workloads
 
 app = Flask(__name__)
-
-client = OpenAI(
-    base_url="https://api.netmind.ai/inference-api/openai/v1",
-    api_key="2d5f3905331943cfbebcf472e959e146",)
-
-# Hugging Face API headers
-HEADERS = {"Authorization": "Bearer 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"}
 
 STOPWORDS = {
     "the", "and", "to", "of", "in", "a", "is", "it", "that", "on", "for", "with", "as", "was",
@@ -56,23 +51,21 @@ def detect_language(text_pages):
     except:
         return "en"
 
-def summarize_text(text, lang="en"):
-    if lang == "en":
-        model_url = "https://api-inference.huggingface.co/models/google/pegasus-cnn_dailymail"
-    else:
-        model_url = "https://api-inference.huggingface.co/models/facebook/mbart-large-cc25"
-    payload = {"inputs": text[:1000]}
-    response = requests.post(model_url, headers=HEADERS, json=payload)
-    if response.status_code == 200:
-        return response.json()[0].get("summary_text", "(No summary returned)")
-    return f"(Summary error: {response.text})"
+def gemma_summarize(text, lang="en"):
+    prompt = (
+        "Summarize the following text clearly and concisely.\n\n"
+        f"Text:\n{text[:4000]}\n\nSummary:"
+    )
+    model = genai.GenerativeModel(GEMMA_MODEL)
+    response = model.generate_content(prompt)
+    return response.text.strip()
 
 def summarize_full(text_pages, lang):
-    return summarize_text(" ".join(text_pages), lang)
+    return gemma_summarize(" ".join(text_pages), lang)
 
 def summarize_by_page(text_pages, lang):
     return "\n".join(
-        f"Page {i+1}:\n{summarize_text(page, lang)}\n"
+        f"Page {i+1}:\n{gemma_summarize(page, lang)}\n"
         for i, page in enumerate(text_pages) if len(page.strip()) > 50
     )
 
@@ -81,7 +74,7 @@ def summarize_in_groups(text_pages, lang, group_size=3):
     for i in range(0, len(text_pages), group_size):
         chunk = " ".join(text_pages[i:i+group_size])
         if len(chunk.strip()) > 50:
-            summaries.append(f"Pages {i+1}-{min(i+group_size, len(text_pages))}:\n{summarize_text(chunk, lang)}\n")
+            summaries.append(f"Pages {i+1}-{min(i+group_size, len(text_pages))}:\n{gemma_summarize(chunk, lang)}\n")
     return "\n".join(summaries)
 
 def extract_numbers(text_pages):
@@ -92,7 +85,7 @@ def search_and_summarize_by_keyword(text_pages, keyword, lang):
     keyword = keyword.lower()
     for i, page_text in enumerate(text_pages):
         if keyword in page_text.lower():
-            summaries.append(f"Page {i+1}:\n{summarize_text(page_text, lang)}\n")
+            summaries.append(f"Page {i+1}:\n{gemma_summarize(page_text, lang)}\n")
     return "\n".join(summaries) if summaries else f"No results found for '{keyword}'."
 
 def find_most_frequent_keyword(text_pages, lang):
@@ -102,77 +95,43 @@ def find_most_frequent_keyword(text_pages, lang):
         return "(No valid keywords found.)"
     top_keyword, _ = Counter(filtered).most_common(1)[0]
     summaries = [
-        f"Page {i+1}:\n{summarize_text(page, lang)}\n"
+        f"Page {i+1}:\n{gemma_summarize(page, lang)}\n"
         for i, page in enumerate(text_pages) if top_keyword in page.lower()
     ]
     return f"Most frequent keyword: **{top_keyword}**\n\n" + "\n".join(summaries)
 
 def ask_question_local(summary, question):
-    model = "google/flan-t5-base"  # Better for natural Q&A
-    API_URL = f"https://api-inference.huggingface.co/models/{model}"
-    headers = {"Authorization": HEADERS["Authorization"]}
-    
     prompt = (
-        f"You are a helpful assistant. Based on the summary below, answer the user's question clearly.\n\n"
+        "You are a helpful assistant. Based on the summary below, answer the user's question clearly.\n\n"
         f"Summary:\n{summary}\n\n"
         f"Question: {question}\n"
         f"Answer:"
     )
-
-    payload = {"inputs": prompt}
-    response = requests.post(API_URL, headers=headers, json=payload)
-
-    try:
-        result = response.json()
-        if "error" in result:
-            return f"(Hugging Face Error: {result['error']})"
-
-        ai_answer = result[0].get("generated_text", "").strip()
-        return (
-            f"As for your uploaded PDF, here’s what I found:\n\n"
-            f"📌 Question: {question}\n"
-            f"💬 Answer: {ai_answer}\n\n"
-            f"Generally, this is based on the summarized content of the document."
-        )
-
-    except Exception as e:
-        return f"(Error while generating answer: {str(e)})"
-
+    model = genai.GenerativeModel(GEMMA_MODEL)
+    response = model.generate_content(prompt)
+    ai_answer = response.text.strip()
+    return (
+        f"As for your uploaded PDF, here’s what I found:\n\n"
+        f"📌 Question: {question}\n"
+        f"💬 Answer: {ai_answer}\n\n"
+        f"Generally, this is based on the summarized content of the document."
+    )
 
 def aichat_main(question):
-    model = "google/flan-t5-large"
-    API_URL = f"https://api-inference.huggingface.co/models/{model}"
-    headers = {"Authorization": HEADERS["Authorization"]}
-
     prompt = (
         "You are a helpful assistant. Answer the user's question clearly and concisely.\n\n"
         f"Question: {question}\n"
         "Answer:"
     )
-
-    payload = {"inputs": prompt}
-
-    try:
-        response = requests.post(API_URL, headers=headers, json=payload)
-        result = response.json()
-
-        if "error" in result:
-            return f"(Hugging Face Error: {result['error']})"
-
-        ai_answer = result[0].get("generated_text", "").strip()
-
-        return (
-            f"Here’s what I found:\n\n"
-            f"📌 Question: {question}\n"
-            f"💬 Answer: {ai_answer}\n\n"
-            f"Generally, this is for educational use only."
-        )
-
-    except Exception as e:
-        return f"(Error while generating answer: {str(e)})"
-
-
-
+    model = genai.GenerativeModel(GEMMA_MODEL)
+    response = model.generate_content(prompt)
+    ai_answer = response.text.strip()
+    return (
+        f"Here’s what I found:\n\n"
+        f"📌 Question: {question}\n"
+        f"💬 Answer: {ai_answer}\n\n"
+        f"Generally, this is for educational use only."
+    )
 
 def remove_non_latin(text):
     return unicodedata.normalize('NFKD', text).encode('latin-1', 'ignore').decode('latin-1')
@@ -203,38 +162,30 @@ def generate_number_illustrations(text_pages):
     full_text = " ".join(text_pages)
     lines = full_text.split('.')
     data = []
-
     for line in lines:
-        # Skip short or non-numbered lines
         if len(line.strip()) < 10 or not re.search(r'\d', line):
             continue
-
-        # Build prompt
         prompt = (
             "Understand what the number(s) mean in the sentence below, "
             "and write the answer like: Label in Year = Value\n\n"
             f"Sentence: {line.strip()}\nAnswer:"
         )
-
         try:
-            chat_response = client.chat.completions.create(
-                model="google/gemma-3-27b-it",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=100
-            )
-            reply = chat_response.choices[0].message.content.strip()
+            model = genai.GenerativeModel(GEMMA_MODEL)
+            response = model.generate_content(prompt)
+            reply = response.text.strip()
             if "=" in reply and "in" in reply:
                 data.append(reply)
-
         except Exception as e:
             print("⚠️ AI error:", e)
             continue
-
-    print("✅ Final Netmind data:", data)
+    print("✅ Final Gemma data:", data)
     return data[:10]
 
-
-
+def translate_text(text, src_lang, tgt_lang):
+    # For translation, you may need to use a dedicated translation API, as Gemma is not a translation model.
+    # Placeholder: simply return the original text.
+    return text
 
 # --- Flask Routes ---
 
@@ -246,6 +197,9 @@ def upload_file():
         keyword = request.form.get("keyword", "").strip()
         question = request.form.get("question", "").strip()
         chat_question = request.form.get("chat_question", "").strip()
+        translate_enabled = request.form.get("translate")
+        src_lang = request.form.get("src_lang", "auto").strip()
+        tgt_lang = request.form.get("tgt_lang", "en").strip()
 
         if chat_question and not pdf:
             chat_answer = aichat_main(chat_question)
@@ -259,25 +213,37 @@ def upload_file():
                 chat_answer=chat_answer
             )
 
-
         if not pdf and not chat_question:
             return render_template("upload.html", error="Please upload a PDF or ask a question.")
-
 
         pdf.save("uploaded.pdf")
         generate_page_images("uploaded.pdf")
 
         try:
-            pdf.seek(0)  # ✅ reset before reading
+            pdf.seek(0)
             text_pages = extract_text_from_pdf(pdf)
             if not any(text.strip() for text in text_pages):
                 raise ValueError("Empty text, using OCR")
         except:
-            pdf.seek(0)  # ✅ reset again before OCR
+            pdf.seek(0)
             text_pages = extract_text_with_ocr(pdf)
 
-
         lang = detect_language(text_pages)
+
+        if translate_enabled:
+            try:
+                text_pages = [translate_text(page, src_lang, tgt_lang) for page in text_pages]
+            except Exception as e:
+                return render_template("upload.html", error=f"Translation failed: {str(e)}")
+
+            translated_filename = "translated_summary.txt"
+            translated_filepath = os.path.join("static", translated_filename)
+            translated_text = "\n\n".join(text_pages)
+            with open(translated_filepath, "w", encoding="utf-8") as f:
+                f.write(translated_text)
+        else:
+            translated_filename = None
+            translated_text = None
 
         if mode == "full":
             summary = summarize_full(text_pages, lang)
@@ -309,7 +275,6 @@ def upload_file():
             answer = None
             matched_pages = None
 
-        # ✅ generate chat_answer here for regular modes
         chat_answer = aichat_main(chat_question) if chat_question else None
 
         return render_template(
@@ -319,11 +284,12 @@ def upload_file():
             answer=answer,
             pages=matched_pages,
             illustrations=None,
-            chat_answer=chat_answer
+            chat_answer=chat_answer,
+            translated_filename=translated_filename,
+            translated_text=translated_text
         )
 
     return render_template("upload.html")
-
 
 @app.route("/ask", methods=["POST"])
 def ask_about_pdf():
@@ -333,11 +299,8 @@ def ask_about_pdf():
     context = "\n\n".join(text_pages)
     answer = ask_question_local(context, question)
     matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())]
-# Prepare image links for matched pages
     image_links = [f"/static/page_images/page_{page}.png" for page in matched_pages]
-
     return render_template("result.html", question=question, answer=answer, pages=matched_pages, images=image_links)
-
 
 @app.route("/download", methods=["POST"])
 def download_summary():

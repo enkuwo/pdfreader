@@ -56,7 +56,11 @@
             <button type="submit">Download Summary</button>
         </form>
     {% endif %}
-
+    {% if translated_filename %}
+        <a href="{{ url_for('static', filename=translated_filename) }}" download>
+            <button>Download Translated File</button>
+        </a>
+    {% endif %}
     {% if question %}
         <hr>
         <h3>Question: {{ question }}</h3>

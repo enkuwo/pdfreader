@@ -34,6 +34,38 @@
         <div id="keywordInput" style="display: none; margin-top: 10px;">
             <input type="text" name="keyword" placeholder="Enter keyword to search">
         </div>
+        <div style="margin-top: 30px;">
+            <label><strong>Translate PDF (optional):</strong></label><br>
+            <input type="checkbox" id="translateToggle" name="translate" value="1" onchange="toggleTranslationOptions()">
+            <label for="translateToggle">Enable Translation</label>
+
+            <div id="translationOptions" style="display: none; margin-top: 10px;">
+                <label>From:</label>
+                <select name="src_lang">
+                    <option value="">Auto-detect</option>
+                    <option value="en">English</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="es">Spanish</option>
+                    <option value="it">Italian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="zh">Chinese</option>
+                </select>
+
+                <label style="margin-left: 10px;">To:</label>
+                <select name="tgt_lang" required>
+                    <option value="en">English</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="es">Spanish</option>
+                    <option value="it">Italian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="zh">Chinese</option>
+                </select>
+            </div>
+        </div>
 
         <button type="submit">Summarize PDF</button>
         <br><br><br><br>
@@ -47,6 +79,11 @@
     function toggleKeywordInput(mode) {
         const keywordBox = document.getElementById('keywordInput');
         keywordBox.style.display = (mode === 'keyword') ? 'block' : 'none';
+    }
+    function toggleTranslationOptions() {
+        const translationOptions = document.getElementById('translationOptions');
+        const toggle = document.getElementById('translateToggle');
+        translationOptions.style.display = toggle.checked ? 'block' : 'none';
     }
 </script>
 
