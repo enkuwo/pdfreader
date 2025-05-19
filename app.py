@@ -12,7 +12,7 @@ from docx import Document
 import io
 import unicodedata
 import os
-from tensorflow import keras  # For TF/Keras
+#from tensorflow import keras  # For TF/Keras
 
 import google.generativeai as genai
 
