@@ -1,6 +1,9 @@
 # For more information, please refer to https://aka.ms/vscode-docker-python
 FROM python:3-slim
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y poppler-utils
+
 EXPOSE 5002
 
 # Keeps Python from generating .pyc files in the container
@@ -12,6 +15,7 @@ ENV PYTHONUNBUFFERED=1
 # Install pip requirements
 COPY requirements.txt .
 RUN python -m pip install -r requirements.txt
+
 
 WORKDIR /app
 COPY . /app
