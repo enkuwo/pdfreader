@@ -1,107 +1,162 @@
+/* Import Inter font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+/* Floating card animation */
+@keyframes floatIn {
+    0% {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.container {
+    animation: floatIn 0.8s ease-in-out;
+}
+.summary-block, .tab-content, table {
+    animation: floatIn 1s ease-in-out;
+}
+
+
 /* Base layout */
 body {
-    font-family: 'Segoe UI', sans-serif;
-    background-color: #f0f2f5;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background-color: #f7f9fb;
     margin: 0;
     padding: 40px;
-    color: #2e2e2e;
+    color: #1f1f1f;
+    transition: background-color 0.3s ease;
+}
+
+/* Smooth fade-in animation */
+body, .container, .tab-content, button, input, select, textarea {
+    animation: fadeIn 0.6s ease-in-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Center container */
 .container {
-    max-width: 800px;
+    max-width: 860px;
     margin: auto;
     background: #ffffff;
     padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
 }
 
 /* Headings */
-h1, h2, p {
+h1, h2, h3, h4 {
     text-align: center;
     margin-bottom: 24px;
+    color: #111827;
 }
-/* Form inputs */
+
+p {
+    text-align: center;
+    color: #4b5563;
+}
+
+/* Input fields and select */
 input[type="file"],
 input[type="text"],
 select {
     width: 100%;
-    padding: 12px 14px;
+    padding: 14px;
     font-size: 16px;
-    margin-top: 10px;
-    margin-bottom: 16px;
-    border: 1px solid #ccc;
-    border-radius: 10px;
-    box-sizing: border-box;
-    background-color: #fafafa;
+    border: 1px solid #d1d5db;
+    border-radius: 12px;
+    background-color: #f9fafb;
+    margin: 12px 0;
+    transition: all 0.2s;
+}
+
+input:focus,
+select:focus {
+    border-color: #10a37f;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.2);
 }
 
 /* Buttons */
 button {
-    padding: 12px 20px;
+    padding: 14px 24px;
     font-size: 16px;
     background-color: #10a37f;
     color: white;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: all 0.25s ease;
 }
 
 button:hover {
     background-color: #0e8c6d;
+    transform: translateY(-1px);
 }
 
 /* Error message */
 .error {
-    color: red;
+    color: #dc2626;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 12px;
+    border-radius: 10px;
     text-align: center;
     margin-bottom: 20px;
 }
 
 /* Tabs */
 .tab-buttons {
-    text-align: center;
-    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 24px;
 }
 
 .tab-buttons button {
-    background: #e4e6eb;
-    color: #333;
-    margin: 0 10px;
-    border-radius: 8px;
+    background: #f3f4f6;
+    color: #374151;
     padding: 10px 18px;
-    border: none;
+    border-radius: 10px;
     font-weight: 500;
+    border: none;
 }
 
 .tab-buttons button:hover {
-    background: #d8dadd;
+    background: #e5e7eb;
 }
 
-.tab-buttons button.active {
+.tab-buttons .active {
     background: #10a37f;
-    color: white;
+    color: #fff;
 }
 
 /* Tab content */
 .tab-content {
     display: none;
+    transition: opacity 0.3s ease;
 }
 
 .tab-content.active {
     display: block;
+    opacity: 1;
 }
 
-/* Summary block */
+/* Summary / answer block */
 .summary-block {
-    background-color: #f9f9f9;
+    background-color: #f9fafb;
     padding: 20px;
-    border-radius: 12px;
-    border: 1px solid #ddd;
-    line-height: 1.6;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+    line-height: 1.65;
     white-space: pre-wrap;
+    color: #1f2937;
 }
 
 /* Table styles */
@@ -109,37 +164,87 @@ table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
+    font-size: 15px;
 }
 
 th, td {
-    border: 1px solid #ddd;
-    padding: 12px;
+    border: 1px solid #e5e7eb;
+    padding: 14px;
     text-align: center;
 }
 
 th {
-    background-color: #f0f2f5;
-    font-weight: bold;
+    background-color: #f3f4f6;
+    font-weight: 600;
+    color: #111827;
 }
 
-/* Download form */
+/* Download form layout */
 .download-form {
     margin-top: 30px;
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
     justify-content: center;
-    gap: 10px;
+    align-items: center;
 }
 
-/* Link */
+/* Links */
 a {
-    display: block;
-    text-align: center;
-    margin-top: 20px;
     color: #10a37f;
+    text-align: center;
+    display: block;
+    margin-top: 30px;
     text-decoration: none;
+    font-weight: 500;
 }
 
 a:hover {
     text-decoration: underline;
+}
+
+/* Image styling */
+.image-container img {
+    max-width: 100%;
+    height: auto;
+    margin: 10px 0;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+/* === DARK MODE SUPPORT === */
+body.dark {
+    background-color: #1e1e1e;
+    color: #f5f5f5;
+}
+body.dark .container {
+    background-color: #2c2c2c;
+    box-shadow: none;
+}
+body.dark input,
+body.dark select {
+    background-color: #3a3a3a;
+    border-color: #555;
+    color: #eee;
+}
+body.dark .summary-block,
+body.dark table,
+body.dark th,
+body.dark td {
+    background-color: #333;
+    border-color: #555;
+    color: #eee;
+}
+body.dark .tab-buttons button {
+    background: #444;
+    color: #eee;
+}
+body.dark .tab-buttons .active {
+    background: #10a37f;
+    color: white;
+}
+body.dark button {
+    background-color: #10a37f;
+}
+body.dark a {
+    color: #10a37f;
 }
