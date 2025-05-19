@@ -1,32 +1,25 @@
-# Use Python slim as base image
-FROM python:3.11-slim
+# For more information, please refer to https://aka.ms/vscode-docker-python
+FROM python:3-slim
 
-# Avoid prompts during package install
-ENV DEBIAN_FRONTEND=noninteractive
+EXPOSE 5002
 
-# Install system dependencies for OCR and PDF handling
-RUN apt-get update && \
-    apt-get install -y \
-    tesseract-ocr \
-    poppler-utils \
-    gcc \
-    libgl1 \
-    libglib2.0-0 \
-    && apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# Set working directory
+# Turns off buffering for easier container logging
+ENV PYTHONUNBUFFERED=1
+
+# Install pip requirements
+COPY requirements.txt .
+RUN python -m pip install -r requirements.txt
+
 WORKDIR /app
+COPY . /app
 
-# Copy project files
-COPY . .
+# Creates a non-root user with an explicit UID and adds permission to access the /app folder
+# For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
+RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
+USER appuser
 
-# Install Python packages
-RUN pip install --no-cache-dir -r requirements.txt \
-    && pip install gunicorn
-
-# Expose port for Render (or general web service)
-EXPOSE 5000
-
-# Run Flask app with gunicorn in production mode
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
+CMD ["gunicorn", "--bind", "0.0.0.0:5002", "app:app"]
