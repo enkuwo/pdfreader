@@ -1,5 +1,5 @@
-from flask import Flask, request, render_template, send_file
-
+from flask import Flask, request, render_template, send_file, request, jsonify
+import joblib  # For scikit-learn
 import fitz  # PyMuPDF
 import re
 from collections import Counter
@@ -12,6 +12,7 @@ from docx import Document
 import io
 import unicodedata
 import os
+from tensorflow import keras  # For TF/Keras
 
 import google.generativeai as genai
 

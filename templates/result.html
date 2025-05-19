@@ -57,7 +57,7 @@
         </form>
     {% endif %}
     {% if translated_filename %}
-        <a href="{{ url_for('static', filename=translated_filename) }}" download>
+        <a href="{{ url_for('static', filename=translated_summary.txt) }}" download>
             <button>Download Translated File</button>
         </a>
     {% endif %}
