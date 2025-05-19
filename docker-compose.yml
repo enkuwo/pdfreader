@@ -1,0 +1,8 @@
+services:
+  pdfreader:
+    image: pdfreader
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 5002:5002
