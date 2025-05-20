@@ -162,26 +162,36 @@ def export_summary_to_word(summary_text):
 def generate_number_illustrations(text_pages):
     full_text = " ".join(text_pages)
     lines = full_text.split('.')
+
+    # Only keep lines that contain a number and are long enough
+    filtered_lines = [line.strip() for line in lines if len(line.strip()) > 10 and re.search(r'\d', line)]
+
+    # Limit total number of lines to analyze (to save memory)
+    limited_lines = filtered_lines[:50]  # You can adjust this
+
+    # Combine into a single prompt
+    prompt = (
+        "Extract number-related facts from the following text. "
+        "Format each fact like this: Label in Year = Value\n\n"
+        + "\n".join(limited_lines)
+    )
+
     data = []
-    for line in lines:
-        if len(line.strip()) < 10 or not re.search(r'\d', line):
-            continue
-        prompt = (
-            "Understand what the number(s) mean in the sentence below, "
-            "and write the answer like: Label in Year = Value\n\n"
-            f"Sentence: {line.strip()}\nAnswer:"
-        )
-        try:
-            model = genai.GenerativeModel(GEMMA_MODEL)
-            response = model.generate_content(prompt)
-            reply = response.text.strip()
-            if "=" in reply and "in" in reply:
-                data.append(reply)
-        except Exception as e:
-            print("⚠️ AI error:", e)
-            continue
+    try:
+        model = genai.GenerativeModel(GEMMA_MODEL)
+        response = model.generate_content(prompt)
+        results = response.text.strip().split("\n")
+
+        for line in results:
+            if "=" in line and "in" in line:
+                data.append(line.strip())
+
+    except Exception as e:
+        print("⚠️ AI error:", e)
+
     print("✅ Final Gemma data:", data)
-    return data[:10]
+    return data[:10]  # only return top 10 facts
+
 
 def translate_text(text, src_lang, tgt_lang):
     # For translation, you may need to use a dedicated translation API, as Gemma is not a translation model.
