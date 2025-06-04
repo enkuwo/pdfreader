@@ -1,23 +1,24 @@
-from flask import Flask, request, render_template, send_file, jsonify
+from flask import Flask, request, render_template, send_file, request, jsonify
 import joblib  # For scikit-learn
 import fitz  # PyMuPDF
 import re
-import os
-import io
-import unicodedata
 from collections import Counter
 from langdetect import detect
 from pdf2image import convert_from_bytes, convert_from_path
+import pytesseract
 from PIL import Image
 from fpdf import FPDF
 from docx import Document
-import pytesseract
-from googletrans import Translator
+import io
+import unicodedata
+import os
+#from tensorflow import keras  # For TF/Keras
+
 import google.generativeai as genai
 
 # --- Google Gemma 3 API Setup ---
 genai.configure(api_key="AIzaSyCIRCrUjUdkRiW0tETGunbe8W1ujleLayQ")
-GEMMA_MODEL = "gemma-3-27b-it"
+GEMMA_MODEL = "gemma-3-27b-it"  # You can use "gemma-3-4b-it" for lighter workloads
 
 app = Flask(__name__)
 
@@ -27,12 +28,14 @@ STOPWORDS = {
 }
 
 # --- Utilities ---
+
 def extract_text_with_ocr(pdf_bytes):
     images = convert_from_bytes(pdf_bytes.read())
     return [pytesseract.image_to_string(img) for img in images]
 
 def generate_page_images(pdf_path):
-    os.makedirs("static/page_images", exist_ok=True)
+    if not os.path.exists("static/page_images"):
+        os.makedirs("static/page_images")
     for file in os.listdir("static/page_images"):
         os.remove(os.path.join("static/page_images", file))
     images = convert_from_path(pdf_path)
@@ -79,11 +82,11 @@ def extract_numbers(text_pages):
     return "Found numbers:\n" + ", ".join(re.findall(r'\b\d+(?:\.\d+)?\b', " ".join(text_pages)))
 
 def search_and_summarize_by_keyword(text_pages, keyword, lang):
+    summaries = []
     keyword = keyword.lower()
-    summaries = [
-        f"Page {i+1}:\n{gemma_summarize(page_text, lang)}\n"
-        for i, page_text in enumerate(text_pages) if keyword in page_text.lower()
-    ]
+    for i, page_text in enumerate(text_pages):
+        if keyword in page_text.lower():
+            summaries.append(f"Page {i+1}:\n{gemma_summarize(page_text, lang)}\n")
     return "\n".join(summaries) if summaries else f"No results found for '{keyword}'."
 
 def find_most_frequent_keyword(text_pages, lang):
@@ -101,7 +104,9 @@ def find_most_frequent_keyword(text_pages, lang):
 def ask_question_local(summary, question):
     prompt = (
         "You are a helpful assistant. Based on the summary below, answer the user's question clearly.\n\n"
-        f"Summary:\n{summary}\n\nQuestion: {question}\nAnswer:"
+        f"Summary:\n{summary}\n\n"
+        f"Question: {question}\n"
+        f"Answer:"
     )
     model = genai.GenerativeModel(GEMMA_MODEL)
     response = model.generate_content(prompt)
@@ -157,36 +162,53 @@ def export_summary_to_word(summary_text):
 def generate_number_illustrations(text_pages):
     full_text = " ".join(text_pages)
     lines = full_text.split('.')
+
+    # Only keep lines that contain a number and are long enough
     filtered_lines = [line.strip() for line in lines if len(line.strip()) > 10 and re.search(r'\d', line)]
-    limited_lines = filtered_lines[:50]
+
+    # Limit total number of lines to analyze (to save memory)
+    limited_lines = filtered_lines[:50]  # You can adjust this
+
+    # Combine into a single prompt
     prompt = (
         "Extract number-related facts from the following text. "
         "Format each fact like this: Label in Year = Value\n\n"
         + "\n".join(limited_lines)
     )
+
     data = []
     try:
         model = genai.GenerativeModel(GEMMA_MODEL)
         response = model.generate_content(prompt)
         results = response.text.strip().split("\n")
+
         for line in results:
             if "=" in line and "in" in line:
                 data.append(line.strip())
+
     except Exception as e:
         print("⚠️ AI error:", e)
+
     print("✅ Final Gemma data:", data)
-    return data[:10]
+    return data[:10]  # only return top 10 facts
+
+from googletrans import Translator
 
 def translate_text(text, src_lang='auto', tgt_lang='en'):
+    """
+    Translate text using Google Translate via googletrans.
+    src_lang: source language code (e.g., 'auto', 'en', 'ko')
+    tgt_lang: target language code (e.g., 'en', 'fr', 'ko')
+    """
     translator = Translator()
     try:
         result = translator.translate(text, src=src_lang, dest=tgt_lang)
         return result.text
     except Exception as e:
         print(f"Translation error: {e}")
-        return text
-
+        return text  # fallback: return original if translation fails
 # --- Flask Routes ---
+
 @app.route("/", methods=["GET", "POST"])
 def upload_file():
     if request.method == "POST":
@@ -201,7 +223,16 @@ def upload_file():
 
         if chat_question and not pdf:
             chat_answer = aichat_main(chat_question)
-            return render_template("result.html", summary=None, question=None, answer=None, pages=None, illustrations=None, chat_answer=chat_answer)
+            return render_template(
+                "result.html",
+                summary=None,
+                question=None,
+                answer=None,
+                pages=None,
+                illustrations=None,
+                chat_answer=chat_answer
+
+            )
 
         if not pdf and not chat_question:
             return render_template("upload.html", error="Please upload a PDF or ask a question.")
@@ -225,6 +256,7 @@ def upload_file():
                 text_pages = [translate_text(page, src_lang, tgt_lang) for page in text_pages]
             except Exception as e:
                 return render_template("upload.html", error=f"Translation failed: {str(e)}")
+
             translated_filename = "translated_summary.txt"
             translated_filepath = os.path.join("static", translated_filename)
             translated_text = "\n\n".join(text_pages)
@@ -250,19 +282,37 @@ def upload_file():
             summary = find_most_frequent_keyword(text_pages, lang)
         elif mode == "illustration":
             illustrations = generate_number_illustrations(text_pages)
-            summary = summarize_full(text_pages, lang)
+            summary = summarize_full(text_pages, lang)  # optional
             chat_answer = aichat_main(chat_question) if chat_question else None
             return render_template("result.html", summary=summary, illustrations=illustrations, question=None, answer=None, pages=None, chat_answer=chat_answer)
         else:
             summary = "(Invalid mode selected.)"
 
-        answer = ask_question_local(summary, question) if question else None
-        matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())] if answer else None
+        if question:
+            context = summary
+            answer = ask_question_local(context, question)
+            matched_pages = [i+1 for i, page in enumerate(text_pages) if any(word.lower() in page.lower() for word in answer.split())]
+        else:
+            answer = None
+            matched_pages = None
+
         chat_answer = aichat_main(chat_question) if chat_question else None
 
-        return render_template("result.html", summary=summary, question=question, answer=answer, pages=matched_pages, illustrations=None, chat_answer=chat_answer, translated_filename=translated_filename, translated_summary=translated_text)
+        return render_template(
+            "result.html",
+            summary=summary,
+            question=question,
+            answer=answer,
+            pages=matched_pages,
+            illustrations=None,
+            chat_answer=chat_answer,
+            translated_filename=translated_filename,
+            translated_summary=translated_text,
+
+        )
 
     return render_template("upload.html")
+
 
 @app.route("/ask", methods=["POST"])
 def ask_about_pdf():
@@ -279,10 +329,12 @@ def ask_about_pdf():
 def download_summary():
     summary = request.form.get("summary")
     file_type = request.form.get("filetype", "pdf")
-    output = export_summary_to_word(summary) if file_type == "word" else export_summary_to_pdf(summary)
-    filename = "summary.docx" if file_type == "word" else "summary.pdf"
-    mimetype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" if file_type == "word" else "application/pdf"
-    return send_file(output, as_attachment=True, download_name=filename, mimetype=mimetype)
+    if file_type == "word":
+        output = export_summary_to_word(summary)
+        return send_file(output, as_attachment=True, download_name="summary.docx", mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    else:
+        output = export_summary_to_pdf(summary)
+        return send_file(output, as_attachment=True, download_name="summary.pdf", mimetype="application/pdf")
 
 if __name__ == "__main__":
     app.run(debug=False)

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>PDF Summary Result</title>
+    <title>Summary Result</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -10,27 +10,34 @@
 <div class="container">
 
     {% if summary %}
-        <h2>📄 PDF Summary</h2>
+        <h2>PDF Summary</h2>
 
+        <!-- Tabs -->
         <div class="tab-buttons">
             <button onclick="showTab('summary')">📝 Summary</button>
             <button onclick="showTab('chart')">📊 Chart</button>
             <button onclick="showTab('table')">📋 Table</button>
         </div>
 
+        <!-- Search -->
         <input type="text" id="searchInput" placeholder="Search in summary..." oninput="searchSummary()">
 
+        <!-- Summary -->
         <div id="tab-summary" class="tab-content active summary-block">
-            {{ summary | safe }}
-        </div>
+    {{ summary | e | safe }}
+</div>
 
+        <!-- Chart -->
         <div id="tab-chart" class="tab-content">
             <canvas id="myChart" width="100%" height="60"></canvas>
         </div>
 
+        <!-- Table -->
         <div id="tab-table" class="tab-content">
             <table>
-                <thead><tr><th>Keyword</th><th>Count</th></tr></thead>
+                <thead>
+                    <tr><th>Keyword</th><th>Count</th></tr>
+                </thead>
                 <tbody>
                     <tr><td>example</td><td>5</td></tr>
                     <tr><td>data</td><td>3</td></tr>
@@ -38,6 +45,7 @@
             </table>
         </div>
 
+        <!-- Download -->
         <form action="/download" method="post" class="download-form">
             <input type="hidden" name="summary" value="{{ summary }}">
             <label for="filetype">Download as:</label>
@@ -48,17 +56,15 @@
             <button type="submit">Download Summary</button>
         </form>
     {% endif %}
-
     {% if translated_filename %}
         <a href="{{ url_for('static', filename=translated_filename) }}" download>
             <button>Download Translated File</button>
         </a>
     {% endif %}
-
     {% if question %}
         <hr>
-        <h3>❓ Question: {{ question }}</h3>
-        <div class="summary-block"><strong>💬 Answer:</strong> {{ answer }}</div>
+        <h3>Question: {{ question }}</h3>
+        <div class="summary-block"><strong>Answer:</strong> {{ answer }}</div>
         {% if pages %}
             <p><strong>Relevant pages:</strong></p>
             <ul>
@@ -69,19 +75,18 @@
         {% else %}
             <p>No exact page match found.</p>
         {% endif %}
-        {% if images %}
+        
         <div class="image-container">
             <h4>Related Images:</h4>
             {% for image in images %}
                 <img src="{{ image }}" alt="Related Image">
             {% endfor %}
         </div>
-        {% endif %}
     {% endif %}
 
     {% if summary %}
         <hr>
-        <h3>💬 Ask a Question About This PDF:</h3>
+        <h3>Ask a question about this PDF:</h3>
         <form action="/ask" method="post">
             <input type="text" name="question" placeholder="Ask something..." required style="width: 100%; padding: 10px; margin-bottom: 10px;">
             <button type="submit">Ask</button>
@@ -92,30 +97,37 @@
         <hr>
         <h3>📊 AI-Extracted Numbers & Their Meaning</h3>
         <table>
-            <thead><tr><th>Label</th><th>Value</th></tr></thead>
+            <thead>
+                <tr><th>Label</th><th>Value</th></tr>
+            </thead>
             <tbody>
-                {% for item in illustrations %}
-                    {% set parts = item.split('=') %}
-                    <tr>
-                        <td>{{ parts[0].strip() }}</td>
-                        <td>{{ parts[1].strip() if parts|length > 1 else "" }}</td>
-                    </tr>
-                {% endfor %}
+            {% for item in illustrations %}
+                {% set parts = item.split("=") %}
+                <tr>
+                    <td>{{ parts[0].strip() }}</td>
+                    <td>{{ parts[1].strip() if parts|length > 1 else "" }}</td>
+                </tr>
+            {% endfor %}
             </tbody>
         </table>
     {% endif %}
 
+    <a href="/">⬅ Back to upload</a>
     {% if chat_answer %}
         <hr>
         <h3>🧠 General Question Answer:</h3>
         <div class="summary-block">{{ chat_answer }}</div>
     {% endif %}
+    <button onclick="toggleDarkMode()" style="position: fixed; top: 20px; right: 20px; z-index: 999;">
+        🌓 Toggle Mode
+    </button>
 
-    <a href="/">⬅ Back to upload</a>
-    <button onclick="toggleDarkMode()" style="position: fixed; top: 20px; right: 20px; z-index: 999;">🌓 Toggle Mode</button>
 </div>
 
+<!-- External JS -->
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+<!-- Chart Init -->
 <script>
 const ctx = document.getElementById('myChart');
 if (ctx) {
@@ -131,15 +143,17 @@ if (ctx) {
         }
     });
 }
-function toggleDarkMode() {
-    document.body.classList.toggle("dark");
-    localStorage.setItem("darkMode", document.body.classList.contains("dark"));
-}
-window.onload = () => {
-    if (localStorage.getItem("darkMode") === "true") {
-        document.body.classList.add("dark");
-    }
-};
 </script>
+<script>
+    function toggleDarkMode() {
+        document.body.classList.toggle("dark");
+        localStorage.setItem("darkMode", document.body.classList.contains("dark"));
+    }
+    window.onload = () => {
+        if (localStorage.getItem("darkMode") === "true") {
+            document.body.classList.add("dark");
+        }
+    };
+    </script>
 </body>
 </html>
