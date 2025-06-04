@@ -1,29 +1,23 @@
-# For more information, please refer to https://aka.ms/vscode-docker-python
-FROM python:3-slim
+FROM python:3.11-slim
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y poppler-utils
+# Install system packages
+RUN apt-get update && \
+    apt-get install -y \
+    tesseract-ocr \
+    poppler-utils \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/*
 
-EXPOSE 5002
-
-# Keeps Python from generating .pyc files in the container
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# Turns off buffering for easier container logging
-ENV PYTHONUNBUFFERED=1
-
-# Install pip requirements
-COPY requirements.txt .
-RUN python -m pip install -r requirements.txt
-
-
+# Set working directory
 WORKDIR /app
-COPY . /app
 
-# Creates a non-root user with an explicit UID and adds permission to access the /app folder
-# For more info, please refer to https://aka.ms/vscode-docker-python-configure-containers
-RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /app
-USER appuser
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
-CMD ["gunicorn", "--bind", "0.0.0.0:5002", "app:app"]
+# Copy app files
+COPY . .
+
+# Start the app
+CMD ["gunicorn", "app:app"]
