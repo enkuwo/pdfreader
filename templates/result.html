@@ -24,8 +24,8 @@
 
         <!-- Summary -->
         <div id="tab-summary" class="tab-content active summary-block">
-            {{ summary|safe }}
-        </div>
+    {{ summary | e | safe }}
+</div>
 
         <!-- Chart -->
         <div id="tab-chart" class="tab-content">
@@ -57,7 +57,7 @@
         </form>
     {% endif %}
     {% if translated_filename %}
-        <a href="{{ url_for('static', filename=translated_summary.txt) }}" download>
+        <a href="{{ url_for('static', filename=translated_filename) }}" download>
             <button>Download Translated File</button>
         </a>
     {% endif %}

@@ -192,12 +192,21 @@ def generate_number_illustrations(text_pages):
     print("✅ Final Gemma data:", data)
     return data[:10]  # only return top 10 facts
 
+from googletrans import Translator
 
-def translate_text(text, src_lang, tgt_lang):
-    # For translation, you may need to use a dedicated translation API, as Gemma is not a translation model.
-    # Placeholder: simply return the original text.
-    return text
-
+def translate_text(text, src_lang='auto', tgt_lang='en'):
+    """
+    Translate text using Google Translate via googletrans.
+    src_lang: source language code (e.g., 'auto', 'en', 'ko')
+    tgt_lang: target language code (e.g., 'en', 'fr', 'ko')
+    """
+    translator = Translator()
+    try:
+        result = translator.translate(text, src=src_lang, dest=tgt_lang)
+        return result.text
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return text  # fallback: return original if translation fails
 # --- Flask Routes ---
 
 @app.route("/", methods=["GET", "POST"])
@@ -222,6 +231,7 @@ def upload_file():
                 pages=None,
                 illustrations=None,
                 chat_answer=chat_answer
+
             )
 
         if not pdf and not chat_question:
@@ -297,10 +307,12 @@ def upload_file():
             illustrations=None,
             chat_answer=chat_answer,
             translated_filename=translated_filename,
-            translated_text=translated_text
+            translated_summary=translated_text,
+
         )
 
     return render_template("upload.html")
+
 
 @app.route("/ask", methods=["POST"])
 def ask_about_pdf():
