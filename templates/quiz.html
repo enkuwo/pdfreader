@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quiz</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script>
+        const quizData = {{ quiz|tojson }};
+        console.log(quizData);
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+
+</head>
+<body>
+    <button onclick="toggleDarkMode()" style="position: fixed; top: 20px; right: 20px; z-index: 999;">
+        🌓 Toggle Mode
+    </button>
+<div class="main-container">
+    <h2>Quiz</h2>
+    <div id="quiz-area"></div>
+    <div class="nav-buttons">
+        <button id="prev-btn" class="btn" style="display:none;">Previous</button>
+        <button id="next-btn" class="btn" style="display:none;">Next</button>
+    </div>
+    <form action="/" method="get">
+        <button type="submit" class="btn">Back to Upload</button>
+    </form>
+</div>
+</body>
+</html>
