@@ -41,6 +41,7 @@ function renderChart() {
         });
     }
 }
+
 let currentQuestion = 0;
 let score = 0;
 let answered = []; // To track if each question has been answered
